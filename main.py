@@ -34,6 +34,33 @@ def parse_zip(uploaded_zip):
                     filenames.append(name)
     return texts, filenames
 
+from collections import deque
+
+
+def divide_chunks(data, chunksize):
+    """
+    Divide an iterator into chunks of the given size.
+    The last chunks might be smaller that the chunksize.
+
+    :param data: Anything that iterates values
+    :param chunksize: Size of the
+    """
+    data_iter = iter(data)
+    buffer = deque()
+
+    while True:
+        try:
+            buffer.append(next(data_iter))
+        except StopIteration:
+            break
+
+        if len(buffer) == chunksize:
+            yield list(buffer)
+            buffer.clear()
+
+    if buffer:
+        yield list(buffer)
+
 @app.post("/")
 async def upload(
     language: str = Form(),
@@ -44,5 +71,9 @@ async def upload(
     texts, filenames = parse_zip(debias_zip)
     
     dereference_dict = dict(zip(texts, filenames))
+
+    for chunk in divide_chunks(texts, 5):
+        print(chunk)
+        # TODO here we will call debias api
     
     return dereference_dict
