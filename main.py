@@ -1,7 +1,42 @@
 from fastapi import FastAPI, Form, File, UploadFile, Request
 from pydantic import EmailStr
 from zipfile import ZipFile
+import os
+import uvicorn
+from fastapi import BackgroundTasks
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 
+DEBIAS_API_URL: str = os.getenv("DEBIAS_API_URL")
+MAIL_USERNAME: str = os.getenv("MAIL_USERNAME", "")
+MAIL_PASSWORD: str = os.getenv("MAIL_PASSWORD", "")
+MAIL_FROM = os.getenv("MAIL_FROM", "do-not-reply@debias.eu")
+MAIL_PORT = os.getenv("MAIL_PORT", 587)
+MAIL_SERVER = os.getenv("MAIL_SERVER", "")
+MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "")
+
+conf = ConnectionConfig(
+    MAIL_USERNAME = MAIL_USERNAME,
+    MAIL_PASSWORD = MAIL_PASSWORD,
+    MAIL_FROM = MAIL_FROM,
+    MAIL_PORT = MAIL_PORT,
+    MAIL_SERVER = MAIL_SERVER,
+    MAIL_FROM_NAME = MAIL_FROM_NAME,
+    MAIL_STARTTLS=True,
+    MAIL_SSL_TLS=False,
+    USE_CREDENTIALS=True,
+    TEMPLATE_FOLDER='./templates/'
+)
+
+def send_email_background(background_tasks: BackgroundTasks, subject: str, email_to: str, body: dict):
+    message = MessageSchema(
+        subject=subject,
+        recipients=[email_to],
+        body=body,
+        subtype='html',
+    )
+    fm = FastMail(conf)
+    background_tasks.add_task(
+       fm.send_message, message, template_name='email.html')
 app = FastAPI()
 
 
@@ -73,7 +108,14 @@ async def upload(
     dereference_dict = dict(zip(texts, filenames))
 
     for chunk in divide_chunks(texts, 5):
-        print(chunk)
+        body = {
+            "language": language,
+            "values": chunk
+        }
+
         # TODO here we will call debias api
     
     return dereference_dict
+
+if __name__ == '__main__':
+    uvicorn.run('main:app', reload=True)
